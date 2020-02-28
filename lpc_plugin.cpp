@@ -28,6 +28,8 @@ static LV2_Handle instantiate(
 {
 	LPCPlugin* lpc_plugin = (LPCPlugin*) calloc(1, sizeof(LPCPlugin));
 	
+	lpc_plugin->lpc_instance = lpc_create();
+	
 	return (LV2_Handle) lpc_plugin;
 }
 
@@ -46,13 +48,13 @@ static void connect_port (
 			lpc_plugin->output = (float*)data;
 			break;
 	}
+	
 }
 
 static void activate (LV2_Handle instance)
 {
-	LPCPlugin* lpc_plugin = (LPCPlugin*) instance;
+	//LPCPlugin* lpc_plugin = (LPCPlugin*) instance;
 	
-	lpc_plugin->lpc_instance = lpc_create();
 }
 
 static void run (
@@ -79,14 +81,16 @@ static void run (
 
 static void deactivate (LV2_Handle instance)
 {
-	LPCPlugin* lpc_plugin = (LPCPlugin*) instance;
 	
-	lpc_destroy(lpc_plugin->lpc_instance);
 }
 
 
 static void cleanup (LV2_Handle instance)
 {
+	LPCPlugin* lpc_plugin = (LPCPlugin*) instance;
+	
+	lpc_destroy(lpc_plugin->lpc_instance);
+	
 	free(instance);
 }
 
