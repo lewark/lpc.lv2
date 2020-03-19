@@ -1,4 +1,5 @@
 @prefix doap:  <http://usefulinc.com/ns/doap#> .
+@prefix foaf:  <http://xmlns.com/foaf/0.1/> .
 @prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
 @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
@@ -7,8 +8,26 @@
 <http://example.com/plugins/lpc_plugin>
 	a lv2:Plugin ;
 	lv2:project <http://example.com> ;
-	doap:name "Linear P" ;
-	doap:license <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html> ;
+	doap:name "Linear Predictive Coding" ;
+	doap:license <http://usefulinc.com/doap/licenses/gpl> ;
+	doap:developer [
+		a foaf:Person ;
+		foaf:name "Ananya Misra" ;
+		foaf:homepage <https://www.cs.princeton.edu/~amisra/> ;
+	] , [
+		a foaf:Person ;
+		foaf:name "Ge Wang" ;
+		foaf:homepage <https://www.cs.princeton.edu/~gewang/> ;
+	] , [
+		a foaf:Person ;
+		foaf:name "Perry Cook" ;
+		foaf:homepage <https://www.cs.princeton.edu/~prc/> ;
+	] ;
+	doap:maintainer [
+		a foaf:Person ;
+		foaf:name "knecraft" ;
+		foaf:homepage <https://example.com> ;
+	] ;
 	lv2:optionalFeature lv2:hardRTCapable ;
 	lv2:port [
 		a lv2:AudioPort ,
@@ -27,7 +46,9 @@
 			lv2:ControlPort ;
 		lv2:index 2 ;
 		lv2:symbol "order" ;
-		lv2:name "Gain" ;
-		
+		lv2:name "Order" ;
+		lv2:default 18.0 ;
+		lv2:minimum 4.0 ;
+		lv2:maximum 100.0 ;
 	] .
 	

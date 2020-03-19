@@ -1,4 +1,4 @@
-#include "lv2/core/lv2.h"
+#include "lv2/lv2plug.in/ns/lv2core/lv2.h"
 #include <math.h>
 #include <stdint.h>
 //#include <iostream>
@@ -7,16 +7,16 @@
 
 #define LPC_URI "http://example.com/plugins/lpc_plugin"
 
-const int order = 18;
-
 typedef enum {
 	LPC_INPUT = 0,
-	LPC_OUTPUT = 1
+	LPC_OUTPUT = 1,
+	LPC_ORDER = 2
 } PortIndex;
 
 typedef struct {
 	const float* input;
 	float* output;
+	float* order;
 	lpc_data lpc_instance;
 } LPCPlugin;
 
@@ -47,6 +47,9 @@ static void connect_port (
 		case LPC_OUTPUT:
 			lpc_plugin->output = (float*)data;
 			break;
+		case LPC_ORDER:
+			lpc_plugin->order = (float*)data;
+			break;
 	}
 	
 }
@@ -65,6 +68,8 @@ static void run (
 	
 	const float* const input = lpc_plugin->input;
 	float* const output = lpc_plugin->output;
+	
+	const int order = (int) *(lpc_plugin->order);
 	
 	float coefs[order];
 	float power;
