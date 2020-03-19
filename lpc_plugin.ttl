@@ -7,8 +7,8 @@
 <http://example.com/plugins/lpc_plugin>
 	a lv2:Plugin ;
 	lv2:project <http://example.com> ;
-	doap:name "LPC Plugin" ;
-	doap:license <http://example.com> ;
+	doap:name "Linear P" ;
+	doap:license <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html> ;
 	lv2:optionalFeature lv2:hardRTCapable ;
 	lv2:port [
 		a lv2:AudioPort ,
@@ -22,5 +22,12 @@
 		lv2:index 1 ;
 		lv2:symbol "out" ;
 		lv2:name "Out"
+	] , [
+		a lv2:InputPort ,
+			lv2:ControlPort ;
+		lv2:index 2 ;
+		lv2:symbol "order" ;
+		lv2:name "Gain" ;
+		
 	] .
 	
