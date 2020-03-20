@@ -10,13 +10,15 @@
 typedef enum {
 	LPC_INPUT = 0,
 	LPC_OUTPUT = 1,
-	LPC_ORDER = 2
+	LPC_ORDER = 2,
+	LPC_WHISPER = 3
 } PortIndex;
 
 typedef struct {
 	const float* input;
 	float* output;
 	float* order;
+	float* whisper;
 	lpc_data lpc_instance;
 } LPCPlugin;
 
@@ -50,6 +52,9 @@ static void connect_port (
 		case LPC_ORDER:
 			lpc_plugin->order = (float*)data;
 			break;
+		case LPC_WHISPER:
+			lpc_plugin->whisper = (float*)data;
+			break;
 	}
 	
 }
@@ -70,6 +75,7 @@ static void run (
 	float* const output = lpc_plugin->output;
 	
 	const int order = (int) *(lpc_plugin->order);
+	const float whisper = *(lpc_plugin->whisper);
 	
 	float coefs[order];
 	float power;
@@ -78,7 +84,9 @@ static void run (
 	lpc_analyze(lpc_plugin->lpc_instance, (float*)input, samples, coefs, order, &power, &pitch);
 	
 	// NOTE: Pitch 0: whisper, other values are wavelength in samples (sample rate over frequency)
-	//pitch = 0.0f;
+	if (whisper > 0) {
+		pitch = 0.0f;
+	}
 	//std::cout << pitch << std::endl;
 	
 	lpc_synthesize(lpc_plugin->lpc_instance, output, samples, coefs, order, power, pitch);
