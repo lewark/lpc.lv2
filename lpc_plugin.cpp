@@ -28,14 +28,17 @@ typedef struct {
 	float* latency;
 	const float* ola;
 	lpc_data lpc_instance;
+	lpc_data lpc_instance2;
 	
 	float* inbuffer;
 	float* outbuffer;
-	int buffer_pos;
+	int buffer1_pos;
 	
 	float* inbuffer2;
 	float* outbuffer2;
 	int buffer2_pos;
+	
+	float* window;
 	
 } LPCPlugin;
 
@@ -49,7 +52,14 @@ static LV2_Handle instantiate(
 	
 	LPCPlugin* lpc_plugin = (LPCPlugin*) malloc(sizeof(LPCPlugin));
 	
+	//lpc_plugin->input = nullptr;
+	//lpc_plugin->output = nullptr;
+	//lpc_plugin->order = nullptr;
+	//lpc_plugin->whisper = nullptr;
+	//lpc_plugin->ola = nullptr;
+	
 	lpc_plugin->lpc_instance = lpc_create();
+	lpc_plugin->lpc_instance2 = lpc_create();
 	
 	lpc_plugin->inbuffer = (float*)malloc(BUFFER_SIZE*sizeof(float));
 	lpc_plugin->outbuffer = (float*)malloc(BUFFER_SIZE*sizeof(float));
@@ -63,8 +73,14 @@ static LV2_Handle instantiate(
 	memset(lpc_plugin->inbuffer2, 0, BUFFER_SIZE * sizeof(float));
 	memset(lpc_plugin->outbuffer2, 0, BUFFER_SIZE * sizeof(float));
 	
-	lpc_plugin->buffer_pos = 0;
+	lpc_plugin->buffer1_pos = 0;
 	lpc_plugin->buffer2_pos = BUFFER_SIZE / 2;
+	
+	lpc_plugin->window = (float*)malloc(BUFFER_SIZE*sizeof(float));
+	for (int i = 0; i < BUFFER_SIZE; i++)
+	{
+		(lpc_plugin->window)[i] = sin((((float)i)*M_PI)/((float)BUFFER_SIZE));
+	}
 	
 	return (LV2_Handle) lpc_plugin;
 }
@@ -106,7 +122,7 @@ static void activate (LV2_Handle instance)
 	//LPCPlugin* lpc_plugin = (LPCPlugin*) instance;
 }
 
-static void process_chunk(LPCPlugin* lpc_plugin, float* inbuffer, float* outbuffer)
+static void process_chunk(LPCPlugin* lpc_plugin, lpc_data lpc_instance, float* inbuffer, float* outbuffer)
 {
 	const int order = (int) *(lpc_plugin->order);
 	const float whisper = *(lpc_plugin->whisper);
@@ -115,7 +131,7 @@ static void process_chunk(LPCPlugin* lpc_plugin, float* inbuffer, float* outbuff
 	float power;
 	float pitch;
 	
-	lpc_analyze(lpc_plugin->lpc_instance, (float*)inbuffer,
+	lpc_analyze(lpc_instance, (float*)inbuffer,
 				BUFFER_SIZE, coefs, order, &power, &pitch);
 	
 	// NOTE: Pitch 0: whisper, other values are wavelength in samples
@@ -124,7 +140,7 @@ static void process_chunk(LPCPlugin* lpc_plugin, float* inbuffer, float* outbuff
 		pitch = 0.0f;
 	}
 	
-	lpc_synthesize(lpc_plugin->lpc_instance, outbuffer,
+	lpc_synthesize(lpc_instance, outbuffer,
 					BUFFER_SIZE, coefs, order, power, pitch);
 }
 
@@ -143,52 +159,59 @@ static void run (
 	float* inbuffer2 = (float*)lpc_plugin->inbuffer2;
 	float* outbuffer2 = (float*)lpc_plugin->outbuffer2;
 	
-	int* buffer_pos = &(lpc_plugin->buffer_pos);
+	float* window = (float*)lpc_plugin->window;
+	
+	int* buffer1_pos = &(lpc_plugin->buffer1_pos);
 	int* buffer2_pos = &(lpc_plugin->buffer2_pos);
 	float* latency = lpc_plugin->latency;
 	
-	const float ola = *(lpc_plugin->ola);
+	const float* ola = lpc_plugin->ola;
 	
-	//std::cout << "run " << *buffer_pos << std::endl;
+	//if (input == nullptr || output == nullptr || ola == nullptr) {
+	//	return;
+	//}
+	
+	//std::cout << "run " << *buffer1_pos << std::endl;
 	
 	for (int i = 0; i < samples; i++) {
 		
-		//std::cout << i << " " << *buffer_pos << std::endl;
+		//std::cout << i << " " << *buffer1_pos << std::endl;
 		
-		if (ola > 0) {
-			float ola_mult1 = sin(((float)(*buffer_pos)*M_PI)/((float)BUFFER_SIZE));
-			float ola_mult2 = sin(((float)(*buffer2_pos)*M_PI)/((float)BUFFER_SIZE));
+		if (*ola > 0) {
+			float ola_mult1 = window[*buffer1_pos];
+			float ola_mult2 = window[*buffer2_pos];
 			
-			inbuffer[*buffer_pos] = input[i] * ola_mult1;
+			inbuffer[*buffer1_pos] = input[i] * ola_mult1;
 			inbuffer2[*buffer2_pos] = input[i] * ola_mult2;
 			
-			output[i] = outbuffer[*buffer_pos] * ola_mult1 + outbuffer2[*buffer2_pos] * ola_mult2;
+			output[i] = (outbuffer[*buffer1_pos] * ola_mult1 +
+						outbuffer2[*buffer2_pos] * ola_mult2);
 		}
 		else {
-			inbuffer[*buffer_pos] = input[i];
+			inbuffer[*buffer1_pos] = input[i];
 			inbuffer2[*buffer2_pos] = 0.0f;
 			
-			output[i] = outbuffer[*buffer_pos];
+			output[i] = outbuffer[*buffer1_pos];
 		}
 		
-		(*buffer_pos)++;
+		(*buffer1_pos)++;
 		(*buffer2_pos)++;
 		
-		if (*buffer_pos >= BUFFER_SIZE) {
-			process_chunk(lpc_plugin, inbuffer, outbuffer);
+		if (*buffer1_pos >= BUFFER_SIZE) {
+			process_chunk(lpc_plugin, lpc_plugin->lpc_instance, inbuffer, outbuffer);
 			
-			*buffer_pos = 0;
+			*buffer1_pos = 0;
 		}
 		if (*buffer2_pos >= BUFFER_SIZE) {
-			if (ola > 0) {
-				process_chunk(lpc_plugin, inbuffer2, outbuffer2);
+			if (*ola > 0) {
+				process_chunk(lpc_plugin, lpc_plugin->lpc_instance2, inbuffer2, outbuffer2);
 			}
 			*buffer2_pos = 0;
 		}
 	}
 	
 	*latency = (float)BUFFER_SIZE;
-	//std::cout << "finish " << *buffer_pos << std::endl;
+	//std::cout << "finish " << *buffer1_pos << std::endl;
 }
 
 static void deactivate (LV2_Handle instance)
@@ -208,9 +231,14 @@ static void cleanup (LV2_Handle instance)
 	LPCPlugin* lpc_plugin = (LPCPlugin*) instance;
 	
 	lpc_destroy(lpc_plugin->lpc_instance);
+	lpc_destroy(lpc_plugin->lpc_instance2);
 	
 	free(lpc_plugin->inbuffer);
 	free(lpc_plugin->outbuffer);
+	free(lpc_plugin->inbuffer2);
+	free(lpc_plugin->outbuffer2);
+	
+	free(lpc_plugin->window);
 	
 	free(lpc_plugin);
 }
