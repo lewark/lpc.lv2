@@ -16,7 +16,8 @@ typedef enum {
 	LPC_OUTPUT = 1,
 	LPC_ORDER = 2,
 	LPC_WHISPER = 3,
-	LPC_LATENCY = 4
+	LPC_LATENCY = 4,
+	LPC_OLA = 5
 } PortIndex;
 
 typedef struct {
@@ -25,11 +26,16 @@ typedef struct {
 	const float* order;
 	const float* whisper;
 	float* latency;
+	const float* ola;
 	lpc_data lpc_instance;
 	
 	float* inbuffer;
 	float* outbuffer;
 	int buffer_pos;
+	
+	float* inbuffer2;
+	float* outbuffer2;
+	int buffer2_pos;
 	
 } LPCPlugin;
 
@@ -51,7 +57,14 @@ static LV2_Handle instantiate(
 	memset(lpc_plugin->inbuffer, 0, BUFFER_SIZE * sizeof(float));
 	memset(lpc_plugin->outbuffer, 0, BUFFER_SIZE * sizeof(float));
 	
+	lpc_plugin->inbuffer2 = (float*)malloc(BUFFER_SIZE*sizeof(float));
+	lpc_plugin->outbuffer2 = (float*)malloc(BUFFER_SIZE*sizeof(float));
+	
+	memset(lpc_plugin->inbuffer2, 0, BUFFER_SIZE * sizeof(float));
+	memset(lpc_plugin->outbuffer2, 0, BUFFER_SIZE * sizeof(float));
+	
 	lpc_plugin->buffer_pos = 0;
+	lpc_plugin->buffer2_pos = BUFFER_SIZE / 2;
 	
 	return (LV2_Handle) lpc_plugin;
 }
@@ -79,6 +92,9 @@ static void connect_port (
 		case LPC_LATENCY:
 			lpc_plugin->latency = (float*)data;
 			break;
+		case LPC_OLA:
+			lpc_plugin->ola = (float*)data;
+			break;
 	}
 	
 }
@@ -88,6 +104,28 @@ static void activate (LV2_Handle instance)
 	//std::cout << "LPC activate" << std::endl;
 	
 	//LPCPlugin* lpc_plugin = (LPCPlugin*) instance;
+}
+
+static void process_chunk(LPCPlugin* lpc_plugin, float* inbuffer, float* outbuffer)
+{
+	const int order = (int) *(lpc_plugin->order);
+	const float whisper = *(lpc_plugin->whisper);
+
+	float coefs[order];
+	float power;
+	float pitch;
+	
+	lpc_analyze(lpc_plugin->lpc_instance, (float*)inbuffer,
+				BUFFER_SIZE, coefs, order, &power, &pitch);
+	
+	// NOTE: Pitch 0: whisper, other values are wavelength in samples
+	// (sample rate over frequency)
+	if (whisper > 0) {
+		pitch = 0.0f;
+	}
+	
+	lpc_synthesize(lpc_plugin->lpc_instance, outbuffer,
+					BUFFER_SIZE, coefs, order, power, pitch);
 }
 
 static void run (
@@ -102,11 +140,14 @@ static void run (
 	float* inbuffer = (float*)lpc_plugin->inbuffer;
 	float* outbuffer = (float*)lpc_plugin->outbuffer;
 	
-	const int order = (int) *(lpc_plugin->order);
-	const float whisper = *(lpc_plugin->whisper);
+	float* inbuffer2 = (float*)lpc_plugin->inbuffer2;
+	float* outbuffer2 = (float*)lpc_plugin->outbuffer2;
 	
 	int* buffer_pos = &(lpc_plugin->buffer_pos);
+	int* buffer2_pos = &(lpc_plugin->buffer2_pos);
 	float* latency = lpc_plugin->latency;
+	
+	const float ola = *(lpc_plugin->ola);
 	
 	//std::cout << "run " << *buffer_pos << std::endl;
 	
@@ -114,29 +155,35 @@ static void run (
 		
 		//std::cout << i << " " << *buffer_pos << std::endl;
 		
-		inbuffer[*buffer_pos] = input[i];
-		output[i] = outbuffer[*buffer_pos];
+		if (ola > 0) {
+			float ola_mult1 = sin(((float)(*buffer_pos)*M_PI)/((float)BUFFER_SIZE));
+			float ola_mult2 = sin(((float)(*buffer2_pos)*M_PI)/((float)BUFFER_SIZE));
+			
+			inbuffer[*buffer_pos] = input[i] * ola_mult1;
+			inbuffer2[*buffer2_pos] = input[i] * ola_mult2;
+			
+			output[i] = outbuffer[*buffer_pos] * ola_mult1 + outbuffer2[*buffer2_pos] * ola_mult2;
+		}
+		else {
+			inbuffer[*buffer_pos] = input[i];
+			inbuffer2[*buffer2_pos] = 0.0f;
+			
+			output[i] = outbuffer[*buffer_pos];
+		}
 		
 		(*buffer_pos)++;
+		(*buffer2_pos)++;
 		
 		if (*buffer_pos >= BUFFER_SIZE) {
-			float coefs[order];
-			float power;
-			float pitch;
-			
-			lpc_analyze(lpc_plugin->lpc_instance, (float*)inbuffer,
-						BUFFER_SIZE, coefs, order, &power, &pitch);
-			
-			// NOTE: Pitch 0: whisper, other values are wavelength in samples
-			// (sample rate over frequency)
-			if (whisper > 0) {
-				pitch = 0.0f;
-			}
-			
-			lpc_synthesize(lpc_plugin->lpc_instance, outbuffer,
-							BUFFER_SIZE, coefs, order, power, pitch);
+			process_chunk(lpc_plugin, inbuffer, outbuffer);
 			
 			*buffer_pos = 0;
+		}
+		if (*buffer2_pos >= BUFFER_SIZE) {
+			if (ola > 0) {
+				process_chunk(lpc_plugin, inbuffer2, outbuffer2);
+			}
+			*buffer2_pos = 0;
 		}
 	}
 	
