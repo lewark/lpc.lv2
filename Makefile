@@ -2,8 +2,9 @@ OBJS = lpc.o lpc_plugin.o
 CC=gcc
 CPP=g++
 INCLUDES=
-CFLAGS=-c -s -O3 -fPIC
-#-g
+CFLAGS=-c -s -O3 -ffast-math -fPIC
+#-g for debug
+#-s -O3 for release
 LIBS=
 
 lpc_plugin.so: $(OBJS) manifest.ttl
