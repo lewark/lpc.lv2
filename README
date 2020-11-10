@@ -1,0 +1,74 @@
+lpc.lv2: LPC analysis + synthesis plugin for LV2
+
+-- ABOUT --
+
+Linear predictive coding (LPC) is an algorithm used to approximate audio
+signals like human speech using an excitation signal and a filter to shape
+the resulting sound. Because it can represent speech signals quite efficiently,
+LPC has seen wide use in speech synthesis and audio compression. Additionally,
+due to its distinctive sound, LPC has been used in popular music to create
+robotic-sounding voice effects.
+
+This plugin aims to serve that last use case by providing an LPC engine for
+use in Linux-based DAW software. Most of the credit should go to Misra et al.,
+the authors of rt_lpc; this project just provides an LV2 wrapper for their
+engine.
+
+For more information on LPC, I recommend reading the following pages:
+  https://en.wikipedia.org/wiki/Linear_predictive_coding
+  https://ccrma.stanford.edu/~hskim08/lpc/
+
+-- INSTALLATION --
+
+> make
+> make install
+
+The Makefile is set to place the plugin at the following path:
+  ~/.lv2/lpc_plugin.lv2
+
+-- PARAMETERS --
+
+Order:
+  The order of the filter created by the LPC engine. Higher values can
+  approximate the original sound more closely. WARNING: if the order is set
+  high enough, then loud resonances can show up. As a result, I recommend
+  adding a peak limiter after this plugin in your DAW.
+
+Whisper:
+  Forces all audio to be treated as unpitched, which forces the excitation
+  signal to always be noise. This creates a whisper-like effect.
+  TODO: Add counterpart setting that forces unpitched signals to be pitched.
+
+OLA:
+  Enables/disables Overlap-Add (OLA) mode. Can improve audio quality but can
+  also cause some dissonance when used with singing. Also increases the CPU
+  load of the plugin significantly.
+  TODO: Reduce the window overlap amount to avoid this dissonance. 
+
+Glottal Pulse:
+  Instead of using a pulse train for the LPC excitation signal, use a glottal
+  sample. Can make the resulting audio sound slightly more realistic.
+
+Preemphasis:
+  Emphasizes the input signal using a high-pass filter prior to running the
+  LPC analysis. Also de-emphasizes the signal output from the LPC synthesizer
+  afterwards.
+
+Pitch:
+  Pitch-shifts the output audio up or down. Can create some neat effects.
+  This setting does nothing if Whisper is enabled.
+  TODO: Fix the overly large impact this setting has on the signal amplitude.
+
+-- CREDITS --
+
+This plugin is heavily based on rt_lpc, which was written by:
+
+  Ananya Misra (amisra@cs.princeton.edu)
+  Ge Wang (gewang@cs.princeton.edu)
+  Perry R. Cook (prc@cs.princeton.edu)
+
+For more information, see the rt_lpc homepage at the Princeton Sound Lab:
+
+  https://soundlab.cs.princeton.edu/software/rt_lpc/
+
+Thanks!

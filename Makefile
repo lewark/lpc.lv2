@@ -27,8 +27,8 @@ clean:
 	rm -f lpc_plugin.so *~ *.o manifest.ttl
 
 install: manifest.ttl lpc_plugin.so
-	mkdir -p ~/.lv2/lpc_plugin.lv2
-	cp manifest.ttl lpc_plugin.ttl lpc_plugin.so ~/.lv2/lpc_plugin.lv2
+	mkdir -p ~/.lv2/lpc.lv2
+	cp manifest.ttl lpc_plugin.ttl lpc_plugin.so ~/.lv2/lpc.lv2
 
 uninstall:
 	rm ~/.lv2/lpc_plugin.lv2/*.so

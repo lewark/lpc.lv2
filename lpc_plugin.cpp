@@ -17,7 +17,10 @@ typedef enum {
 	LPC_ORDER = 2,
 	LPC_WHISPER = 3,
 	LPC_LATENCY = 4,
-	LPC_OLA = 5
+	LPC_OLA = 5,
+	LPC_GLOTTAL = 6,
+	LPC_PREEMPHASIS = 7,
+	LPC_PITCH = 8
 } PortIndex;
 
 typedef struct {
@@ -27,6 +30,9 @@ typedef struct {
 	const float* whisper;
 	float* latency;
 	const float* ola;
+	const float* glottal;
+	const float* preemphasis;
+	const float* pitch;
 	lpc_data lpc_instance;
 	lpc_data lpc_instance2;
 	
@@ -111,6 +117,15 @@ static void connect_port (
 		case LPC_OLA:
 			lpc_plugin->ola = (float*)data;
 			break;
+		case LPC_GLOTTAL:
+			lpc_plugin->glottal = (float*)data;
+			break;
+		case LPC_PREEMPHASIS:
+			lpc_plugin->preemphasis = (float*)data;
+			break;
+		case LPC_PITCH:
+			lpc_plugin->pitch = (float*)data;
+			break;
 	}
 	
 }
@@ -126,22 +141,37 @@ static void process_chunk(LPCPlugin* lpc_plugin, lpc_data lpc_instance, float* i
 {
 	const int order = (int) *(lpc_plugin->order);
 	const float whisper = *(lpc_plugin->whisper);
+	const float glottal = *(lpc_plugin->glottal);
+	const float preemphasis = *(lpc_plugin->preemphasis);
+	const float pitch_scale = *(lpc_plugin->pitch);
 
 	float coefs[order];
 	float power;
 	float pitch;
 	
-	lpc_analyze(lpc_instance, (float*)inbuffer,
+	if (preemphasis > 0)
+	{
+		lpc_preemphasis(inbuffer, BUFFER_SIZE, 0.5f);
+	}
+	
+	lpc_analyze(lpc_instance, inbuffer,
 				BUFFER_SIZE, coefs, order, &power, &pitch);
 	
 	// NOTE: Pitch 0: whisper, other values are wavelength in samples
 	// (sample rate over frequency)
 	if (whisper > 0) {
 		pitch = 0.0f;
+	} else {
+		pitch = pitch / pow(2.0f, pitch_scale);
 	}
 	
 	lpc_synthesize(lpc_instance, outbuffer,
-					BUFFER_SIZE, coefs, order, power, pitch);
+					BUFFER_SIZE, coefs, order, power, pitch, (int)glottal);
+	
+	if (preemphasis > 0)
+	{
+		lpc_deemphasis(outbuffer, BUFFER_SIZE, 0.5f);
+	}
 }
 
 static void run (
