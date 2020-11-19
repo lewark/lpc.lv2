@@ -34,7 +34,6 @@ typedef struct {
 	const float* preemphasis;
 	const float* pitch;
 	lpc_data lpc_instance;
-	lpc_data lpc_instance2;
 	
 	float* inbuffer;
 	float* outbuffer;
@@ -58,14 +57,7 @@ static LV2_Handle instantiate(
 	
 	LPCPlugin* lpc_plugin = (LPCPlugin*) malloc(sizeof(LPCPlugin));
 	
-	//lpc_plugin->input = nullptr;
-	//lpc_plugin->output = nullptr;
-	//lpc_plugin->order = nullptr;
-	//lpc_plugin->whisper = nullptr;
-	//lpc_plugin->ola = nullptr;
-	
 	lpc_plugin->lpc_instance = lpc_create();
-	lpc_plugin->lpc_instance2 = lpc_create();
 	
 	lpc_plugin->inbuffer = (float*)malloc(BUFFER_SIZE*sizeof(float));
 	lpc_plugin->outbuffer = (float*)malloc(BUFFER_SIZE*sizeof(float));
@@ -161,8 +153,10 @@ static void process_chunk(LPCPlugin* lpc_plugin, lpc_data lpc_instance, float* i
 	// (sample rate over frequency)
 	if (whisper > 0) {
 		pitch = 0.0f;
-	} else {
-		pitch = pitch / pow(2.0f, pitch_scale);
+	} else if (pitch > 0) {
+		float pitch_mult = pow(2.0f, pitch_scale/12.0f);
+		pitch = pitch / pitch_mult;
+		power = power * pitch_mult; // correct for power scaling
 	}
 	
 	lpc_synthesize(lpc_instance, outbuffer,
@@ -197,10 +191,6 @@ static void run (
 	
 	const float* ola = lpc_plugin->ola;
 	
-	//if (input == nullptr || output == nullptr || ola == nullptr) {
-	//	return;
-	//}
-	
 	//std::cout << "run " << *buffer1_pos << std::endl;
 	
 	for (int i = 0; i < samples; i++) {
@@ -234,7 +224,7 @@ static void run (
 		}
 		if (*buffer2_pos >= BUFFER_SIZE) {
 			if (*ola > 0) {
-				process_chunk(lpc_plugin, lpc_plugin->lpc_instance2, inbuffer2, outbuffer2);
+				process_chunk(lpc_plugin, lpc_plugin->lpc_instance, inbuffer2, outbuffer2);
 			}
 			*buffer2_pos = 0;
 		}
@@ -250,7 +240,6 @@ static void deactivate (LV2_Handle instance)
 	
 	//const LPCPlugin* lpc_plugin = (const LPCPlugin*) instance;
 	
-	
 }
 
 
@@ -261,7 +250,6 @@ static void cleanup (LV2_Handle instance)
 	LPCPlugin* lpc_plugin = (LPCPlugin*) instance;
 	
 	lpc_destroy(lpc_plugin->lpc_instance);
-	lpc_destroy(lpc_plugin->lpc_instance2);
 	
 	free(lpc_plugin->inbuffer);
 	free(lpc_plugin->outbuffer);
