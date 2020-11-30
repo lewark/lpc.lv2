@@ -126,5 +126,15 @@
 		lv2:minimum 1 ;
 		lv2:maximum 7 ;
 		units:unit units:semitone12TET ;
-	] .
-	
+	] , [
+		a lv2:InputPort ,
+			lv2:ControlPort ;
+		lv2:index 12 ;
+		lv2:symbol "buffer_size" ;
+		lv2:name "Buffer Size" ;
+		lv2:default 2048 ;
+		lv2:minimum 512 ;
+		lv2:maximum 4096 ;
+		lv2:portProperty lv2:integer ;
+		units:unit units:frame ;
+	] .	

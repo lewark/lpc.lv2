@@ -13,7 +13,8 @@
 
 #define LPC_URI "http://example.com/plugins/lpc_plugin"
 
-#define MAX_BUFFER_SIZE 2048
+#define MIN_BUFFER_SIZE 512
+#define MAX_BUFFER_SIZE 4096
 
 typedef enum {
 	LPC_CONTROL,
@@ -27,7 +28,8 @@ typedef enum {
 	LPC_PREEMPHASIS,
 	LPC_PITCH,
 	LPC_TUNING,
-	LPC_BEND_RANGE
+	LPC_BEND_RANGE,
+	LPC_BUFFER_SIZE
 } PortIndex;
 
 typedef struct {
@@ -44,6 +46,7 @@ typedef struct {
 	const float* pitch;
 	const float* tuning;
 	const float* bend_range;
+	const float* buffer_size;
 	
 	LV2_URID midi_MidiEvent;
 	
@@ -65,6 +68,16 @@ typedef struct {
 	float* window;
 	
 } LPCPlugin;
+
+static float get_window_value(int i, int buffer_size) {
+	return pow(sin((float)i*M_PI/(float)buffer_size),2.0f);
+}
+
+static float get_cached_window_value(LPCPlugin* self, int i, int buffer_size, int cache_size)
+{
+	// TODO: might want to interpolate these cached values
+	return self->window[(int)((float)i*(float)cache_size/(float)buffer_size)];
+}
 
 static LV2_Handle instantiate(
 		const LV2_Descriptor* descriptor,
@@ -90,29 +103,18 @@ static LV2_Handle instantiate(
 	
 	self->midi_MidiEvent = map->map(map->handle, LV2_MIDI__MidiEvent);
 	
+	self->rate = rate;
+	
 	self->inbuffer = (float*)malloc(MAX_BUFFER_SIZE*sizeof(float));
 	self->outbuffer = (float*)malloc(MAX_BUFFER_SIZE*sizeof(float));
 	
 	self->inbuffer2 = (float*)malloc(MAX_BUFFER_SIZE*sizeof(float));
 	self->outbuffer2 = (float*)malloc(MAX_BUFFER_SIZE*sizeof(float));
 	
-	memset(self->inbuffer, 0, MAX_BUFFER_SIZE * sizeof(float));
-	memset(self->outbuffer, 0, MAX_BUFFER_SIZE * sizeof(float));
-	
-	memset(self->inbuffer2, 0, MAX_BUFFER_SIZE * sizeof(float));
-	memset(self->outbuffer2, 0, MAX_BUFFER_SIZE * sizeof(float));
-	
-	self->buffer1_pos = 0;
-	self->buffer2_pos = MAX_BUFFER_SIZE / 2;
-	
-	self->bender = 0.0f;
-	self->midi_note = -1;
-	self->rate = rate;
-	
 	self->window = (float*)malloc(MAX_BUFFER_SIZE*sizeof(float));
 	for (int i = 0; i < MAX_BUFFER_SIZE; i++)
 	{
-		(self->window)[i] = pow(sin((((float)i)*M_PI)/((float)MAX_BUFFER_SIZE)),2.0f);
+		(self->window)[i] = get_window_value(i,MAX_BUFFER_SIZE);
 	}
 	
 	return (LV2_Handle) self;
@@ -163,6 +165,9 @@ static void connect_port (
 		case LPC_BEND_RANGE:
 			self->bend_range = (const float*)data;
 			break;
+		case LPC_BUFFER_SIZE:
+			self->buffer_size = (const float*)data;
+			break;
 	}
 	
 }
@@ -171,7 +176,19 @@ static void activate (LV2_Handle instance)
 {
 	//std::cout << "LPC activate" << std::endl;
 	
-	//LPCPlugin* self = (LPCPlugin*) instance;
+	LPCPlugin* self = (LPCPlugin*) instance;
+	
+	memset(self->inbuffer, 0, MAX_BUFFER_SIZE * sizeof(float));
+	memset(self->outbuffer, 0, MAX_BUFFER_SIZE * sizeof(float));
+	
+	memset(self->inbuffer2, 0, MAX_BUFFER_SIZE * sizeof(float));
+	memset(self->outbuffer2, 0, MAX_BUFFER_SIZE * sizeof(float));
+	
+	self->buffer1_pos = 0;
+	self->buffer2_pos = 0;
+	
+	self->bender = 0.0f;
+	self->midi_note = -1;
 }
 
 // returns wavelength in samples for lpc_synthesize
@@ -194,11 +211,14 @@ static void midi_note_off(LPCPlugin* self, uint8_t note) {
 
 static void midi_bender(LPCPlugin* self, const uint8_t* const msg) {
 	int bend_value = (int)msg[1] + (((int)msg[2]) << 7);
-	//std::cout << bend_value << std::endl;
 	self->bender = ((float)(bend_value - 8192)) / 8192.0f;
 }
 
-static void process_chunk(LPCPlugin* self, lpc_data lpc_instance, float* inbuffer, float* outbuffer)
+static void process_chunk(LPCPlugin* self,
+						  lpc_data lpc_instance,
+						  float* inbuffer,
+						  float* outbuffer,
+						  int buffer_size)
 {
 	const int order = (int) *(self->order);
 	const float whisper = *(self->whisper);
@@ -210,13 +230,12 @@ static void process_chunk(LPCPlugin* self, lpc_data lpc_instance, float* inbuffe
 	float power;
 	float pitch;
 	
-	if (preemphasis > 0)
-	{
-		lpc_preemphasis(inbuffer, MAX_BUFFER_SIZE, 0.5f);
+	if (preemphasis > 0) {
+		lpc_preemphasis(inbuffer, buffer_size, 0.5f);
 	}
 	
 	lpc_analyze(lpc_instance, inbuffer,
-				MAX_BUFFER_SIZE, coefs, order, &power, &pitch);
+				buffer_size, coefs, order, &power, &pitch);
 	
 	// NOTE: Pitch 0: whisper, other values are wavelength in samples
 	// (sample rate over frequency)
@@ -237,18 +256,17 @@ static void process_chunk(LPCPlugin* self, lpc_data lpc_instance, float* inbuffe
 		// pitch is wavelength (1/freq), so divide by the pitch scale
 		new_pitch /= pitch_mult;
 		
-		// decrease power as pitch increases to correct for power scaling
+		// decrease power as wavelength increases to correct for power scaling
 		power = power * (pitch/new_pitch);
 		
 		pitch = new_pitch;
 	}
 	
 	lpc_synthesize(lpc_instance, outbuffer,
-					MAX_BUFFER_SIZE, coefs, order, power, pitch, (int)glottal);
+					buffer_size, coefs, order, power, pitch, (int)glottal);
 	
-	if (preemphasis > 0)
-	{
-		lpc_deemphasis(outbuffer, MAX_BUFFER_SIZE, 0.5f);
+	if (preemphasis > 0) {
+		lpc_deemphasis(outbuffer, buffer_size, 0.5f);
 	}
 }
 
@@ -275,7 +293,8 @@ static void run (
 	
 	const float* ola = self->ola_enable;
 	
-	//std::cout << "run " << *buffer1_pos << std::endl;
+	int buffer_size = std::min(std::max((int)(*self->buffer_size),
+		MIN_BUFFER_SIZE),MAX_BUFFER_SIZE);
 	
 	if (self->control != NULL) {
 		LV2_ATOM_SEQUENCE_FOREACH(self->control, ev) {
@@ -303,11 +322,21 @@ static void run (
 	
 	for (int i = 0; i < samples; i++) {
 		
-		//std::cout << i << " " << *buffer1_pos << std::endl;
+		(*buffer1_pos) = (*buffer1_pos) % buffer_size;
+		(*buffer2_pos) = ((*buffer1_pos) + buffer_size/2) % buffer_size;
+		
+		if (*buffer1_pos == 0) {
+			process_chunk(self, self->lpc_instance, inbuffer, outbuffer, buffer_size);
+		}
+		if (*buffer2_pos == 0 && *ola > 0.0f) {
+			process_chunk(self, self->lpc_instance, inbuffer2, outbuffer2, buffer_size);
+		}
 		
 		if (*ola > 0) {
-			float ola_mult1 = window[*buffer1_pos];
-			float ola_mult2 = window[*buffer2_pos];
+			float ola_mult1 = get_cached_window_value(
+				self,*buffer1_pos,buffer_size,MAX_BUFFER_SIZE);
+			float ola_mult2 = get_cached_window_value(
+				self,*buffer2_pos,buffer_size,MAX_BUFFER_SIZE);
 			
 			inbuffer[*buffer1_pos] = input[i]; // * ola_mult1;
 			inbuffer2[*buffer2_pos] = input[i]; // * ola_mult2;
@@ -323,23 +352,9 @@ static void run (
 		}
 		
 		(*buffer1_pos)++;
-		(*buffer2_pos)++;
-		
-		if (*buffer1_pos >= MAX_BUFFER_SIZE) {
-			process_chunk(self, self->lpc_instance, inbuffer, outbuffer);
-			
-			*buffer1_pos = 0;
-		}
-		if (*buffer2_pos >= MAX_BUFFER_SIZE) {
-			if (*ola > 0) {
-				process_chunk(self, self->lpc_instance, inbuffer2, outbuffer2);
-			}
-			*buffer2_pos = 0;
-		}
 	}
 	
-	*latency = (float)MAX_BUFFER_SIZE;
-	//std::cout << "finish " << *buffer1_pos << std::endl;
+	*latency = (float)buffer_size;
 }
 
 static void deactivate (LV2_Handle instance)
