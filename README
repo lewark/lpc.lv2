@@ -11,20 +11,21 @@ distinctive sound, LPC has been used in popular music to create
 robotic-sounding voice effects.
 
 This plugin aims to serve that last use case by providing an LPC engine for
-use in Linux-based DAW software. The plugin itself is simply an LV2 wrapper
-for rt_lpc, which was written by Misra et al.
+use in compatible DAW software. The plugin itself is simply an LV2 wrapper
+for rt_lpc, which was written by Misra et al. Detailed credits are included
+at the end of this README.
 
 For more information on LPC, I recommend the following resources:
   https://en.wikipedia.org/wiki/Linear_predictive_coding
   https://ccrma.stanford.edu/~hskim08/lpc/
-I found the Stanford page especially helpful for understanding the algorithm.
+I found the CCRMA page especially helpful for understanding the algorithm.
 
 -- INSTALLATION --
 
 > make
 > make install
 
-The Makefile is set to place the plugin at the following path:
+By default, the Makefile installs the plugin to the following path:
   ~/.lv2/lpc.lv2
 
 -- PARAMETERS --
@@ -53,14 +54,19 @@ Preemphasis:
   LPC analysis. Also de-emphasizes the signal output from the LPC synthesizer
   afterwards.
 
-Pitch:
+Pitch Shift:
   Pitch-shifts the output audio up or down. Can create some neat effects.
   This setting does nothing if Whisper is enabled.
+
+MIDI Tuning:
+  Sets the root frequency of the MIDI note scale. (default A440)
+
+MIDI Bend Range:
+  Sets the range of the MIDI pitch bend.
 
 -- TODO --
 
 rt_lpc features to re-implement:
-- MIDI pitch control
 - GUI that shows filter response (possibly also show identified pitch)
 
 Implement new features:
@@ -80,5 +86,10 @@ at the Princeton Sound Lab, and its wiki page:
 
   https://soundlab.cs.princeton.edu/software/rt_lpc/
   http://wiki.cs.princeton.edu/index.php/RT_LPC
+
+Additionally, the MIDI features of this plugin were based on x42-autotune by
+Robin Gareus:
+
+	https://github.com/x42/fat1.lv2
 
 Thanks!
