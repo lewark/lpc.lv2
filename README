@@ -88,6 +88,7 @@ Ideas of other possible features:
 * Try other pitch identification algorithms (e.g. FFT-based rather than
   autocorrelation)
 * Add MIDI portamento
+* Try using LV2 Workers to improve performance?
 
 -- CREDITS --
 

@@ -10,43 +10,27 @@
 #include <iostream>
 
 #include "lpc.h"
-
-#define LPC_URI "http://example.com/plugins/lpc_plugin"
+#include "lpc_plugin.h"
 
 #define MIN_BUFFER_SIZE 512
 #define MAX_BUFFER_SIZE 4096
-
-typedef enum {
-	LPC_CONTROL,
-	LPC_INPUT,
-	LPC_OUTPUT,
-	LPC_ORDER,
-	LPC_WHISPER,
-	LPC_LATENCY,
-	LPC_OLA,
-	LPC_GLOTTAL,
-	LPC_PREEMPHASIS,
-	LPC_PITCH,
-	LPC_TUNING,
-	LPC_BEND_RANGE,
-	LPC_BUFFER_SIZE
-} PortIndex;
 
 typedef struct {
 	const LV2_Atom_Sequence* control;
 	const float* input;
 	float* output;
+	float* latency;
 	
 	const float* order;
+	const float* buffer_size;
 	const float* whisper;
-	float* latency;
-	const float* ola_enable;
+	const float* ola;
 	const float* glottal;
 	const float* preemphasis;
 	const float* pitch;
 	const float* tuning;
 	const float* bend_range;
-	const float* buffer_size;
+
 	
 	LV2_URID midi_MidiEvent;
 	
@@ -148,7 +132,7 @@ static void connect_port (
 			self->latency = (float*)data;
 			break;
 		case LPC_OLA:
-			self->ola_enable = (const float*)data;
+			self->ola = (const float*)data;
 			break;
 		case LPC_GLOTTAL:
 			self->glottal = (const float*)data;
@@ -291,7 +275,7 @@ static void run (
 	int* buffer2_pos = &(self->buffer2_pos);
 	float* latency = self->latency;
 	
-	const float* ola = self->ola_enable;
+	const float* ola = self->ola;
 	
 	int buffer_size = std::min(std::max((int)(*self->buffer_size),
 		MIN_BUFFER_SIZE),MAX_BUFFER_SIZE);
