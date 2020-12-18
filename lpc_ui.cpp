@@ -11,11 +11,16 @@
 #define RTK_URI LPC_URI
 #define RTK_GUI "#ui"
 
-#define N_DIALS 5
-#define N_CBTNS 4
+#define DIALS_N 5
+#define CBTNS_N 4
+
+#define DIALS_FIRST LPC_ORDER
+#define CBTNS_FIRST LPC_WHISPER
+#define PORTS_LAST LPC_PREEMPHASIS
+
+#define LBL_MAXLEN 24
 
 typedef struct {
-	const int id;
 	const float default_val;
 	const float min_val;
 	const float max_val;
@@ -25,27 +30,26 @@ typedef struct {
 } DialProp;
 
 typedef struct {
-	const int id;
 	const bool default_val;
 	const char* name;
 } CBtnProp;
 
-const DialProp DIAL_PROPS[N_DIALS] = {
-	{4,18,1,128,1,"Order",""},
-	{5,2048,512,4096,1,"Buffer Size","samples"},
-	{10,0,-24,24,1,"Pitch Shift","semi"},
-	{11,440,400,480,1,"Tuning","Hz"},
-	{12,2,1,7,1,"Bend Range","semi"}
+const DialProp DIAL_PROPS[DIALS_N] = {
+	{18,1,128,1,"Order",""},
+	{2048,512,4096,1,"Buffer Size"," sample"},
+	{0,-24,24,0.01,"Pitch Shift"," semi"},
+	{440,400,480,0.01,"Tuning"," Hz"},
+	{2,1,7,0.01,"Bend Range"," semi"}
 };
 
-const CBtnProp CBTN_PROPS[N_CBTNS] = {
-	{6,0,"Whisper"},
-	{7,0,"OLA"},
-	{8,0,"Glottal Pulse"},
-	{9,0,"Preemphasis"}
+const CBtnProp CBTN_PROPS[CBTNS_N] = {
+	{0,"Whisper"},
+	{0,"OLA"},
+	{0,"Glottal Pulse"},
+	{0,"Preemphasis"}
 };
 
-const char* DIAL_VAL_STR[N_DIALS] = {"10","2048 samples","0 semi","440 Hz","2 semi"};
+const char* DIAL_VAL_STR[DIALS_N] = {"10","2048 samples","0 semi","440 Hz","2 semi"};
 
 typedef struct {
 	LV2UI_Write_Function write_function;
@@ -56,10 +60,10 @@ typedef struct {
 	
 	RobTkXYp* graph;
 	
-	RobTkDial* dials[N_DIALS];
-	RobTkLbl* dlabels[N_DIALS];
-	RobTkLbl* dlabels2[N_DIALS];
-	RobTkCBtn* cbtns[N_CBTNS];
+	RobTkDial* dials[DIALS_N];
+	RobTkLbl* dlabels[DIALS_N];
+	RobTkLbl* dlabels2[DIALS_N];
+	RobTkCBtn* cbtns[CBTNS_N];
 	
 	float* graph_xpts;
 	float* graph_ypts;
@@ -80,6 +84,56 @@ static void darea_expose(cairo_t* cr, void *handle)
 	cairo_fill(cr);
 }
 
+static void update_dial_label(LPC_UI* self, int i)
+{
+	RobTkDial* dial = self->dials[i];
+	RobTkLbl* label = self->dlabels2[i];
+	float value = robtk_dial_get_value(dial);
+	char text[LBL_MAXLEN];
+	if (DIAL_PROPS[i].step == 1.0f) {
+		snprintf(text, LBL_MAXLEN, "%i%s", (int)value, DIAL_PROPS[i].unit);
+	} else {
+		snprintf(text, LBL_MAXLEN, "%.2f%s", value, DIAL_PROPS[i].unit);
+	}
+	robtk_lbl_set_text(label, text);
+}
+
+static bool dial_callback(RobWidget* rw, void* handle)
+{
+	LPC_UI* self = (LPC_UI*)handle;
+	RobTkDial* dial = (RobTkDial*)rw->self;
+	float value = robtk_dial_get_value(dial);
+	for (uint32_t i = 0; i < DIALS_N; i++) {
+		if (self->dials[i] == dial) {
+			update_dial_label(self,i);
+			self->write_function(
+				self->controller, DIALS_FIRST+i,
+				sizeof(float), 0, (const void*)&value
+			);
+			break;
+		}
+	}
+	return true;
+}
+
+static bool cbtn_callback(RobWidget* rw, void* handle)
+{
+	LPC_UI* self = (LPC_UI*)handle;
+	RobTkCBtn* cbtn = (RobTkCBtn*)rw->self;
+	float value = (float)robtk_cbtn_get_active(cbtn);
+	
+	for (uint32_t i = 0; i < CBTNS_N; i++) {
+		if (self->cbtns[i] == cbtn) {
+			self->write_function(
+				self->controller, CBTNS_FIRST+i,
+				sizeof(float), 0, (const void*)&value
+			);
+			break;
+		}
+	}
+	return true;
+}
+
 static LV2UI_Handle
 instantiate(
 		void *const               ui_toplevel,
@@ -95,7 +149,7 @@ instantiate(
 	self->write_function = write_function;
 	self->controller = controller;
 	
-	self->rw = rob_hbox_new(FALSE,0);
+	self->rw = rob_hbox_new(false,0);
 	robwidget_make_toplevel(self->rw,ui_toplevel);
 	robwidget_toplevel_enable_scaling(self->rw);
 	//robtk_queue_scale_change(self->rw,2.0);
@@ -112,27 +166,46 @@ instantiate(
 	
 	self->graph = robtk_xydraw_new(100,100);
 	robtk_xydraw_set_points(self->graph, 10, self->graph_xpts, self->graph_ypts);
-	rob_hbox_child_pack(self->rw,GXY_W(self->graph),FALSE,TRUE);
+	rob_hbox_child_pack(self->rw,GXY_W(self->graph),false,true);
 	robwidget_set_alignment(GXY_W(self->graph),0,0.5);\
 	robtk_xydraw_set_area(self->graph,0,-5,10,5);
 	//robwidget_set_size_request(GXY_W(self->graph), graph_size_request);
 	
-	self->cbtn_panel = rob_vbox_new(FALSE,0);
-	rob_hbox_child_pack(self->rw,self->cbtn_panel,FALSE,TRUE);
+	self->cbtn_panel = rob_vbox_new(false,0);
+	rob_hbox_child_pack(self->rw,self->cbtn_panel,false,true);
 	robwidget_set_alignment(self->cbtn_panel,0,0);
 	
-	self->dial_panel = rob_table_new(4,6,FALSE);
-	rob_hbox_child_pack(self->rw,self->dial_panel,FALSE,TRUE);
+	self->dial_panel = rob_table_new(4,6,false);
+	rob_hbox_child_pack(self->rw,self->dial_panel,false,true);
 	robwidget_set_alignment(self->dial_panel,0,0);
 
-	for (int i = 0; i < N_DIALS; i++) {
+	for (int i = 0; i < DIALS_N; i++) {
 		DialProp prop = DIAL_PROPS[i];
-		
+		// 1: line from center if 0, dot if 1
+		//    2: small shade in dot if 1
+		// 4: arc around knob
+		//    8: arc to default if 1
+		//16: fill bg
 		self->dials[i] = robtk_dial_new(prop.min_val, prop.max_val, prop.step);
-		robtk_dial_set_value(self->dials[i], prop.default_val);
 		
-		self->dlabels[i] = robtk_lbl_new(prop.name); 
-		self->dlabels2[i] = robtk_lbl_new(DIAL_VAL_STR[i]); 
+		// show arc
+		self->dials[i]->displaymode = 1|2|4;
+		if (i == LPC_PITCH-DIALS_FIRST) {
+			// begin arc at dial default (zero)
+			self->dials[i]->displaymode |= 8;
+			float detents[3] = {-12,0,12};
+			robtk_dial_set_detents(self->dials[i],3,detents);
+		} else if (DIAL_PROPS[i].step != 1.0) {
+			robtk_dial_set_detent_default(self->dials[i], true);
+		}
+		
+		robtk_dial_set_default(self->dials[i], prop.default_val);
+		robtk_dial_set_callback(self->dials[i], dial_callback, self);
+		//robtk_dial_set_constained(self->dials[i], false);
+		
+		self->dlabels[i] = robtk_lbl_new(prop.name);
+		self->dlabels2[i] = robtk_lbl_new(DIAL_VAL_STR[i]);
+		robtk_lbl_set_fontdesc(self->dlabels2[i],"Sans 10px");
 		
 		unsigned int x = i*2;
 		unsigned int y = 0;
@@ -148,13 +221,14 @@ instantiate(
 			x,x+2,y+1,y+2,0,0,RTK_SHRINK,RTK_SHRINK);
 	}
 	
-	for (int i = 0; i < N_CBTNS; i++) {
+	for (int i = 0; i < CBTNS_N; i++) {
 		CBtnProp prop = CBTN_PROPS[i];
 		
-		self->cbtns[i] = robtk_cbtn_new(prop.name, GBT_LED_LEFT, TRUE);
+		self->cbtns[i] = robtk_cbtn_new(prop.name, GBT_LED_LEFT, true);
 		robtk_cbtn_set_active(self->cbtns[i], prop.default_val);
+		robtk_cbtn_set_callback(self->cbtns[i], cbtn_callback, self);
 		
-		rob_vbox_child_pack(self->cbtn_panel,GCB_W(self->cbtns[i]),FALSE,TRUE);
+		rob_vbox_child_pack(self->cbtn_panel,GCB_W(self->cbtns[i]),false,true);
 	}
 	
 	return self;
@@ -164,12 +238,12 @@ static void
 cleanup(LV2UI_Handle handle)
 {
 	LPC_UI* self = (LPC_UI*)handle;
-	for (int i = 0; i < N_DIALS; i++) {
+	for (int i = 0; i < DIALS_N; i++) {
 		robtk_dial_destroy(self->dials[i]);
 		robtk_lbl_destroy(self->dlabels[i]);
 		robtk_lbl_destroy(self->dlabels2[i]);
 	}
-	for (int i = 0; i < N_CBTNS; i++) {
+	for (int i = 0; i < CBTNS_N; i++) {
 		robtk_cbtn_destroy(self->cbtns[i]);
 	}
 	
@@ -200,6 +274,18 @@ port_event(LV2UI_Handle handle,
            uint32_t     format,
            const void*  buffer)
 {
+	LPC_UI* self = (LPC_UI*)handle;
+	if (format != 0) {
+		return;
+	}
+	const float value = *((const float*)buffer);
+	if (port_index >= DIALS_FIRST && port_index < CBTNS_FIRST) {
+		int dial_index = port_index-DIALS_FIRST;
+		robtk_dial_set_value(self->dials[dial_index], value);
+		update_dial_label(self, dial_index);
+	} else if (port_index >= CBTNS_FIRST && port_index <= PORTS_LAST) {
+		robtk_cbtn_set_active(self->cbtns[port_index-CBTNS_FIRST], value > 0);
+	}
 }
 
 
