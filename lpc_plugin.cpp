@@ -1,5 +1,6 @@
 #include "lv2/lv2plug.in/ns/lv2core/lv2.h"
 #include "lv2/lv2plug.in/ns/ext/atom/atom.h"
+#include "lv2/lv2plug.in/ns/ext/atom/forge.h"
 #include "lv2/lv2plug.in/ns/ext/atom/util.h"
 #include "lv2/lv2plug.in/ns/ext/midi/midi.h"
 #include "lv2/lv2plug.in/ns/ext/urid/urid.h"
@@ -17,6 +18,7 @@
 
 typedef struct {
 	const LV2_Atom_Sequence* control;
+	LV2_Atom_Sequence* notify;
 	const float* input;
 	float* output;
 	float* latency;
@@ -30,9 +32,11 @@ typedef struct {
 	const float* pitch;
 	const float* tuning;
 	const float* bend_range;
-
 	
-	LV2_URID midi_MidiEvent;
+	LV2_URID_Map*        map;
+	LPCLV2URIs           uris;
+	LV2_Atom_Forge       forge;
+	LV2_Atom_Forge_Frame frame;
 	
 	double rate;
 	
@@ -70,7 +74,7 @@ static LV2_Handle instantiate(
 		const LV2_Feature* const* features)
 {
 	//std::cout << "LPC instantiate" << std::endl;
-	LV2_URID_Map* map = NULL;
+	LV2_URID_Map*        map;
 	for (int i = 0; features[i]; ++i) {
 		if (!strcmp(features[i]->URI, LV2_URID__map)) {
 			map = (LV2_URID_Map*)features[i]->data;
@@ -84,8 +88,9 @@ static LV2_Handle instantiate(
 	LPCPlugin* self = (LPCPlugin*) calloc(1,sizeof(LPCPlugin));
 	
 	self->lpc_instance = lpc_create();
+	self->map = map;
 	
-	self->midi_MidiEvent = map->map(map->handle, LV2_MIDI__MidiEvent);
+	map_lpc_uris(self->map,&self->uris);
 	
 	self->rate = rate;
 	
@@ -115,6 +120,9 @@ static void connect_port (
 	switch ((PortIndex) port) {
 		case LPC_CONTROL:
 			self->control = (const LV2_Atom_Sequence*)data;
+			break;
+		case LPC_NOTIFY:
+			self->notify = (LV2_Atom_Sequence*)data;
 			break;
 		case LPC_INPUT:
 			self->input = (const float*)data;
@@ -282,7 +290,7 @@ static void run (
 	
 	if (self->control != NULL) {
 		LV2_ATOM_SEQUENCE_FOREACH(self->control, ev) {
-			if (ev->body.type == self->midi_MidiEvent) {
+			if (ev->body.type == self->uris.midi_MidiEvent) {
 				const uint8_t* const msg = (const uint8_t*)(ev + 1);
 				switch (lv2_midi_message_type(msg)) {
 					case LV2_MIDI_MSG_NOTE_ON:

@@ -160,15 +160,17 @@ instantiate(
 	self->graph_ypts = (float*)calloc(10,sizeof(float));
 	
 	for (int i = 0; i < 10; i++) {
-		self->graph_xpts[i] = (float)i;
-		self->graph_ypts[i] = pow((float)(i-5),3.0f);
+		self->graph_xpts[i] = ((float)i)/9.0f;
+		self->graph_ypts[i] = 0;//pow((float)(i-5),2.0f);
 	}
 	
-	self->graph = robtk_xydraw_new(100,100);
+	//self->graph=robtk_pbtn_new("Hello")
+	self->graph = robtk_xydraw_new(256,256);
+	//robtk_xydraw_set_area(self->graph,0,0,100,100);
+	robtk_xydraw_set_mapping(self->graph,1,0,0.5,0.5);
 	robtk_xydraw_set_points(self->graph, 10, self->graph_xpts, self->graph_ypts);
-	rob_hbox_child_pack(self->rw,GXY_W(self->graph),false,true);
-	robwidget_set_alignment(GXY_W(self->graph),0,0.5);\
-	robtk_xydraw_set_area(self->graph,0,-5,10,5);
+	rob_hbox_child_pack(self->rw,GXY_W(self->graph),true,true);
+	//robwidget_set_alignment(GXY_W(self->graph),0,0.5);
 	//robwidget_set_size_request(GXY_W(self->graph), graph_size_request);
 	
 	self->cbtn_panel = rob_vbox_new(false,0);

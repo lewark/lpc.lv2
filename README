@@ -22,6 +22,10 @@ I found the CCRMA page especially helpful for understanding the algorithm.
 
 -- INSTALLATION --
 
+DEPENDENCIES: lv2-dev build-essential
+* WITH CUSTOM UI: libcairo2-dev libpango1.0-dev
+* (possibly more that I've forgotten)
+
 > make
 > make install
 
@@ -78,17 +82,24 @@ MIDI Bend Range:
 
 rt_lpc features to re-implement:
 * GUI that shows filter response (possibly also show identified pitch)
+    -- IN PROGRESS
 
 Ideas of other possible features:
 * Add settings that force unpitched signals to be pitched, or mute them
   entirely. Maybe add separate gain controls for pitched/unpitched.
 * Add a slider to change the window overlap amount to reduce the dissonance
   when OLA mode is used on singing audio.
-* Add other excitation waveforms (square, sawtooth, etc)
+* Try other excitation waveforms (square, sawtooth, etc)
 * Try other pitch identification algorithms (e.g. FFT-based rather than
   autocorrelation)
+* Allow use of the plugin as a vocoder(?) by swapping out the excitation
+  waveform with an arbitrary audio input (generally a synth instrument)
 * Add MIDI portamento
-* Try using LV2 Workers to improve performance?
+* Top priority:
+  Try using LV2 Workers to improve performance. Currently at extreme settings
+  the plugin can attempt to process 4096 samples of data within a time window
+  intended for only 512 samples (the default JACK buffer size), which leads to
+  performance problems.
 
 -- CREDITS --
 
@@ -99,9 +110,19 @@ at the Princeton Sound Lab, and its wiki page:
   https://soundlab.cs.princeton.edu/software/rt_lpc/
   http://wiki.cs.princeton.edu/index.php/RT_LPC
 
-Additionally, the MIDI features of this plugin were based on x42-autotune by
-Robin Gareus:
+Additionally, much this plugin's MIDI and GUI code of this plugin was based on
+code from x42-autotune and Simple Scope by Robin Gareus, and the UI uses Gareus'
+robtk toolkit.
 
 	https://github.com/x42/fat1.lv2
+	https://github.com/x42/sisco.lv2
+	https://github.com/x42/robtk
+
+The example plugins from the LV2 project were also instrumental during
+development, especially the eg-amp and eg-midigate examples written by David
+Robillard, and the eg-scope example based on Simple Scope.
+
+	https://lv2plug.in/book
+	https://github.com/lv2/lv2
 
 Thanks!
