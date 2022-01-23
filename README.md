@@ -7,7 +7,7 @@ LPC analysis + synthesis plugin for LV2
 
 Linear predictive coding (LPC) is an algorithm used to approximate audio signals like human speech. The algorithm generates an excitation signal (such as a pulse wave) that then passes through a filter to emulate the vocal tract. Because it can represent speech signals quite efficiently, LPC has seen wide use in speech synthesis and audio compression. Additionally, due to its distinctive sound, LPC has been used in popular music to create robotic-sounding voice effects.
 
-This plugin aims to serve that last use case by providing an LPC engine for use in compatible DAW software. The plugin itself is simply an LV2 wrapper for rt_lpc, which was written by Misra et al. Detailed credits are included at the end of this README.
+This plugin aims to serve that last use case by providing an LPC engine for use in compatible DAW software. The plugin itself is simply an LV2 wrapper for rt\_lpc, which was written by Misra et al. Detailed credits are included at the end of this README.
 
 For more information on LPC, I recommend the following resources:
 
@@ -16,7 +16,9 @@ For more information on LPC, I recommend the following resources:
 
 I found the CCRMA page especially helpful for understanding the algorithm.
 
-## Installation
+## Compiling
+
+This plugin is intended to be compiled and used on Linux. Other platforms have not been tested.
 
 Dependencies:
 
@@ -27,7 +29,11 @@ Dependencies:
 
 (there are possibly more that I've forgotten)
 
+To download the source code, compile it, and then install it, run the following commands in a terminal:
+
 ```
+git clone --recurse-submodules https://github.com/knector01/lpc.lv2
+cd lpc.lv2
 make
 make install
 ```
@@ -94,7 +100,7 @@ Additionally, much this plugin's MIDI and GUI code of this plugin was based on c
 * https://github.com/x42/sisco.lv2
 * https://github.com/x42/robtk
 
-The example plugins from the LV2 project were also instrumental during development, especially the eg-amp and eg-midigate examples written by David Robillard, and the eg-scope example based on Simple Scope.
+The example plugins from the LV2 project were also instrumental during development, especially the eg-amp and eg-midigate examples written by David Robillard, and the eg-scope example that Simple Scope was built on.
 
 * https://lv2plug.in/book
 * https://github.com/lv2/lv2
