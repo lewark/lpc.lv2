@@ -1,6 +1,8 @@
 # lpc.lv2
 LPC analysis + synthesis plugin for LV2
 
+![Screenshot of plugin](https://github.com/knector01/lpc.lv2/blob/main/lpc-screenshot.png?raw=true)
+
 ## About
 
 Linear predictive coding (LPC) is an algorithm used to approximate audio signals like human speech. The algorithm generates an excitation signal (such as a pulse wave) that then passes through a filter to emulate the vocal tract. Because it can represent speech signals quite efficiently, LPC has seen wide use in speech synthesis and audio compression. Additionally, due to its distinctive sound, LPC has been used in popular music to create robotic-sounding voice effects.
