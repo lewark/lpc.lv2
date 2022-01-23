@@ -16,7 +16,13 @@ I found the CCRMA page especially helpful for understanding the algorithm.
 
 ## Installation
 
-DEPENDENCIES: lv2-dev build-essential libcairo2-dev libpango1.0-dev
+Dependencies:
+
+* lv2-dev
+* build-essential
+* libcairo2-dev
+* libpango1.0-dev
+
 (there are possibly more that I've forgotten)
 
 ```
@@ -25,6 +31,7 @@ make install
 ```
 
 By default, the Makefile installs the plugin to the following path:
+
 ```
 ~/.lv2/lpc.lv2
 ```
