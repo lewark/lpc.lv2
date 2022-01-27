@@ -85,7 +85,7 @@ Ideas of other possible features:
 * Try other pitch identification algorithms (e.g. FFT-based rather than autocorrelation)
 * Allow use of the plugin as a vocoder(?) by swapping out the excitation waveform with an arbitrary audio input (generally a synth instrument)
 * Add MIDI portamento
-* Try using LV2 Workers to improve performance. Currently at extreme settings the plugin can attempt to process 4096 samples of data within a time window intended for only 512 samples (the default JACK buffer size), which leads to performance problems.
+* Try to improve performance. Currently at extreme settings the plugin can attempt to process 4096 samples of data within a time window intended for only 512 samples (the default JACK buffer size), which leads to performance problems.
 
 ## Credits
 
